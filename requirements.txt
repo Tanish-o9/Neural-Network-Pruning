@@ -1,0 +1,7 @@
+torch>=2.3
+torchvision
+torch-pruning>=1.4
+numpy
+pandas
+matplotlib
+tqdm
