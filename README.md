@@ -83,6 +83,7 @@ neural-network-pruning/
 ├── benchmark.py            # latency, memory, size, MACs, sparse-kernel demo
 ├── plot_results.py         # all plots
 ├── main.py                 # runs the full experiment end to end
+├── app.py                  # interactive Streamlit dashboard & studio
 ├── requirements.txt
 └── results/                # created by main.py
     ├── results.csv
@@ -112,6 +113,9 @@ python main.py
 
 # Redraw plots from an existing results.csv
 python main.py --plots-only
+
+# 3. Launch Interactive Streamlit Dashboard
+streamlit run app.py
 ```
 
 | Flag | Meaning |
