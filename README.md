@@ -243,6 +243,12 @@ Python, PyTorch, `torch.nn.utils.prune`, Torch-Pruning, torchvision, pandas, mat
 - Mishra et al., *Accelerating Sparse Deep Neural Networks* (2021), NVIDIA 2:4 sparsity
 - Torch-Pruning: https://github.com/VainF/Torch-Pruning
 
+## Author
+
+👤 **Tanish Kumar**
+- **GitHub Profile:** [@Tanish-o9](https://github.com/Tanish-o9)
+- **Repository:** [Neural-Network-Pruning](https://github.com/Tanish-o9/Neural-Network-Pruning)
+
 ## License
 
 MIT
