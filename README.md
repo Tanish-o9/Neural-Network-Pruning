@@ -1,5 +1,11 @@
 # Neural Network Pruning: Quality vs Efficiency
 
+[![CI Pipeline & Verification](https://github.com/Tanish-o9/Neural-Network-Pruning/actions/workflows/ci.yml/badge.svg)](https://github.com/Tanish-o9/Neural-Network-Pruning/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Python 3.10+](https://img.shields.io/badge/Python-3.10%2B-blue.svg)](https://www.python.org/)
+[![PyTorch 2.x](https://img.shields.io/badge/PyTorch-2.x-red.svg)](https://pytorch.org/)
+[![Streamlit Studio](https://img.shields.io/badge/Streamlit-Studio-FF4B4B.svg)](https://streamlit.io/)
+
 Can we remove weights or whole structures from a trained network to make it smaller or cheaper to run, without losing much quality? This project answers that for ResNet18 on CIFAR-10 by comparing **unstructured pruning** (zeroing individual weights) with **structured pruning** (removing whole channels), and by measuring what actually matters: **real latency, memory and file size**, not just the percentage of zero weights.
 
 ## The question in one table
@@ -59,6 +65,28 @@ Baseline ResNet18 (trained once, cached)
    v
 Same metrics for every model -> results.csv -> plots
 ```
+
+## System Architecture & Pipeline
+
+![System Architecture](assets/architecture_diagram.png)
+
+```mermaid
+flowchart TD
+    Data["CIFAR-10 Dataset<br/>(32x32 RGB, 10 Classes)"] --> Baseline["Baseline ResNet-18<br/>(11.17M Parameters • 93.8% Acc)"]
+    
+    Baseline --> Unstruct["Unstructured Pruning<br/>torch.nn.utils.prune (Global L1 Magnitude)"]
+    Baseline --> Struct["Structured Pruning<br/>Torch-Pruning (Filter & Channel Removal)"]
+    
+    Unstruct --> U_Stage["Pruning Grid: 10%, 30%, 50%, 70%, 90%<br/>(Without FT & With Cosine FT)"]
+    Struct --> S_Stage["Parameter-Matched Grid: 10%, 30%, 50%, 70%<br/>(Without FT & With Cosine FT)"]
+    
+    U_Stage --> Profiler["Profiling & Benchmark Engine<br/>• Top-1 Accuracy<br/>• Real Latency (CPU Threads & CUDA GPU)<br/>• Physical vs gzip Memory Footprint<br/>• Dense vs Non-Zero MACs / FLOPs"]
+    S_Stage --> Profiler
+    
+    Profiler --> Results["results/results.csv & Publication Plots"]
+    Profiler --> Studio["Streamlit Interactive Studio (app.py)<br/>• Live Image Inference & Test<br/>• On-the-Fly PyTorch Pruner<br/>• 2D Weight Tensor Memory Heatmap<br/>• Checkpoint Download & CLI Controller"]
+```
+
 
 Design decisions:
 
