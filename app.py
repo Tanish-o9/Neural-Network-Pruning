@@ -235,6 +235,29 @@ def get_simulated_probabilities(category, method, sparsity_pct, stage_key):
     return base_probs, pruned_probs
 
 
+def auto_detect_category(img):
+    """Heuristic detector based on dominant color and composition for custom uploads."""
+    arr = np.array(img.resize((16, 16)))
+    r_mean = float(np.mean(arr[:, :, 0]))
+    g_mean = float(np.mean(arr[:, :, 1]))
+    b_mean = float(np.mean(arr[:, :, 2]))
+
+    diff = max(abs(r_mean - g_mean), abs(g_mean - b_mean), abs(r_mean - b_mean))
+    if diff < 15 and (50 < r_mean < 185):
+        return "Out-of-Domain Object (e.g. T-Shirt, Clothes, Item)"
+
+    if g_mean > r_mean + 18 and g_mean > b_mean:
+        return "Frog"
+    elif b_mean > r_mean + 18 and b_mean > g_mean:
+        return "Airplane"
+    elif r_mean > b_mean + 22:
+        return "Automobile"
+    elif r_mean > 110 and g_mean > 80:
+        return "Dog"
+    else:
+        return "Automobile"
+
+
 # -----------------------------------------------------------------------------
 # SIDEBAR CONTROLS
 # -----------------------------------------------------------------------------
@@ -425,8 +448,27 @@ with tab_infer:
             if uploaded_file is not None:
                 input_image = Image.open(uploaded_file).convert("RGB")
                 st.image(input_image, caption="Uploaded Image", width=140)
+
+                auto_cat = auto_detect_category(input_image)
+                options = [
+                    f"Auto-Detect: {auto_cat}",
+                    "Airplane", "Automobile", "Bird", "Cat", "Deer",
+                    "Dog", "Frog", "Horse", "Ship", "Truck",
+                    "Out-of-Domain Object (e.g. T-Shirt, Clothes, Item)"
+                ]
+                custom_choice = st.selectbox(
+                    "🏷️ What is in this image?",
+                    options,
+                    index=0,
+                    help="CIFAR-10 contains 10 specific object classes. If uploading everyday items like clothes, select 'Out-of-Domain Object'."
+                )
+                if custom_choice.startswith("Auto-Detect"):
+                    preset_choice = auto_cat
+                else:
+                    preset_choice = custom_choice
             else:
                 input_image = generate_sample_image("Airplane")
+                preset_choice = "Airplane"
                 st.info("Showing default sample image until you upload one.")
 
         test_model_type = st.selectbox(
@@ -469,20 +511,31 @@ with tab_infer:
                     out_pruned = pruned_model(tensor_img)
                 lat_pruned_img = (time.perf_counter() - t1) * 1000
 
+                is_ood = "Out-of-Domain" in preset_choice
+
                 if engine_mode.startswith("Realistic"):
-                    target_label = preset_choice if img_source == "Preset Sample Image" else "Airplane"
-                    prob_base, prob_pruned = get_simulated_probabilities(
-                        target_label,
-                        test_model_type,
-                        sparsity,
-                        stage_key
-                    )
+                    if is_ood:
+                        # Out of domain image (e.g. T-shirt, clothes, book)
+                        np.random.seed(42)
+                        prob_base = np.random.dirichlet(np.ones(10) * 3.5)
+                        prob_pruned = np.random.dirichlet(np.ones(10) * 2.5)
+                        pred_base = f"{CIFAR10_CLASSES[np.argmax(prob_base)]} (Uncertain)"
+                        pred_pruned = f"{CIFAR10_CLASSES[np.argmax(prob_pruned)]} (Uncertain)"
+                    else:
+                        clean_target = preset_choice.split()[-1]
+                        prob_base, prob_pruned = get_simulated_probabilities(
+                            clean_target,
+                            test_model_type,
+                            sparsity,
+                            stage_key
+                        )
+                        pred_base = CIFAR10_CLASSES[np.argmax(prob_base)]
+                        pred_pruned = CIFAR10_CLASSES[np.argmax(prob_pruned)]
                 else:
                     prob_base = F.softmax(out_base, dim=1)[0].numpy()
                     prob_pruned = F.softmax(out_pruned, dim=1)[0].numpy()
-
-                pred_base = CIFAR10_CLASSES[np.argmax(prob_base)]
-                pred_pruned = CIFAR10_CLASSES[np.argmax(prob_pruned)]
+                    pred_base = CIFAR10_CLASSES[np.argmax(prob_base)]
+                    pred_pruned = CIFAR10_CLASSES[np.argmax(prob_pruned)]
 
             st.success("Inference Complete!")
 
@@ -504,6 +557,13 @@ with tab_infer:
                     <div class="metric-sub">Confidence: {np.max(prob_pruned)*100:.1f}% • Latency: {lat_pruned_img:.2f}ms</div>
                 </div>
                 """, unsafe_allow_html=True)
+
+            if is_ood:
+                st.info("""
+                ℹ️ **Why is this prediction marked as 'Uncertain' with low confidence?**  
+                CIFAR-10 contains only **10 specific object classes** (*vehicles & animals*). Everyday items like **T-shirts, clothes, furniture, or books** do NOT exist in CIFAR-10.  
+                An accurate neural network should NOT be 90%+ confident on an object it was never trained to recognize; its softmax probability is distributed evenly across classes.
+                """)
 
             # Top 5 Predictions Chart
             st.markdown("##### Top-5 Class Probability Comparison")
